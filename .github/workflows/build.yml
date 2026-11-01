@@ -13,12 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Unpack project.zip
+      - name: Find project files
         run: |
-          ls -la
-          test -f project.zip || { echo "project.zip is missing from this repo"; exit 1; }
-          unzip -o project.zip -x ".github/*"
-          ls -la
+          for z in *.zip; do
+            [ -f "$z" ] && unzip -o "$z" -x ".github/*"
+          done
+          if [ ! -f settings.gradle.kts ]; then
+            echo "No Gradle project found. Files in this repo:"
+            ls -la
+            exit 1
+          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -49,6 +53,3 @@ jobs:
           gh release create latest BobsIPTV.apk --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --title "Latest build" \
             --notes "Automated build of ${GITHUB_SHA::7}"
-            
-    
-      
