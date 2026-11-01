@@ -1,0 +1,58 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # First run only: if you uploaded project.zip, unpack it into the repo.
+      - name: Unpack project.zip
+        run: |
+          if [ -f project.zip ] && [ ! -d app ]; then
+            unzip -o project.zip -x ".github/*"
+            rm project.zip
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add -A
+            git commit -m "Unpack project"
+            git push
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk BobsIPTV.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BobsIPTV
+          path: BobsIPTV.apk
+
+      # Stable download link for the TV: .../releases/download/latest/BobsIPTV.apk
+      - name: Publish release (main branch only)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create latest BobsIPTV.apk --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "Latest build" \
+            --notes "Automated build of ${GITHUB_SHA::7}"
